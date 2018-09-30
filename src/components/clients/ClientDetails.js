@@ -1,0 +1,206 @@
+import React, { Component } from "react";
+import { Link } from "react-router-dom";
+import PropTypes from "prop-types";
+import { compose } from "redux";
+import { connect } from "react-redux";
+import { firestoreConnect } from "react-redux-firebase";
+import Spinner from "../layout/Spinner";
+import classnames from "classnames";
+
+class ClientDetails extends Component {
+  state = {
+    showBalanceUpdate: false,
+    balanceUpdateAmount: ""
+  };
+
+  //update balance
+  balanceSubmit = e => {
+    e.preventDefault();
+
+    //console log to test the value to be submitted
+    //console.log(this.state.balanceUpdateAmount);
+
+    // destructuring props and state
+    const { client, firestore } = this.props;
+    const { balanceUpdateAmount } = this.state;
+
+    //convert balance update entered to float then to string;
+    const balanceUpdateFloat = parseFloat(balanceUpdateAmount).toFixed(2);
+    const balanceUpdateToString = balanceUpdateFloat.toString();
+
+    const clientUpdate = {
+      balance: balanceUpdateToString
+    };
+
+    firestore.update(
+      {
+        collection: "clients",
+        doc: client.id
+      },
+      clientUpdate
+    );
+
+    //check whether zero is entered
+    /* let checkZeroIsString = null;
+
+    if (balanceUpdateToString === "0.00") {
+      checkZeroIsString = true;
+    } else {
+      checkZeroIsString = false;
+    }
+
+    console.log(checkZeroIsString); */
+  };
+
+  //Delete client
+  onDeleteClick = () => {
+    const { client, firestore, history } = this.props;
+
+    //Delete from firestore and redirect back to homepage
+    firestore
+      .delete({ collection: "clients", doc: client.id })
+      .then(() => history.push("/"));
+  };
+
+  onChange = e => {
+    this.setState({
+      [e.target.name]: e.target.value
+    });
+  };
+
+  render() {
+    //Destructuring - pull clients out of this.props
+    const { client } = this.props;
+    const { showBalanceUpdate, balanceUpdateAmount } = this.state;
+
+    let balanceForm = "";
+
+    //if balanceForm should display
+    if (showBalanceUpdate) {
+      //take note of the brackets, use () instead of {} line below
+      balanceForm = (
+        <form onSubmit={this.balanceSubmit}>
+          <div className="input-group">
+            <input
+              type="text"
+              className="form-control"
+              name="balanceUpdateAmount"
+              placeholder="Add New Balance"
+              value={balanceUpdateAmount}
+              onChange={this.onChange}
+            />
+            <div className="input-group-append">
+              <input
+                type="submit"
+                value="Update"
+                className="btn btn-outline-dark"
+              />
+            </div>
+          </div>
+        </form>
+      );
+    } else {
+      balanceForm = null;
+    }
+
+    if (client) {
+      return (
+        <div>
+          <div className="row">
+            <div className="col-md-6">
+              <Link to="/" className="btn btn-link">
+                <i className="fas fa-arrow-circle-left" />
+              </Link>
+
+              {/* Adding a span to separate the icon
+                            and the link */}
+              <span>
+                <Link to="/" className="btn btn-link">
+                  Back to Dashboard
+                </Link>
+              </span>
+            </div>
+            <div className="col-md-6">
+              <div className="btn-group float-right">
+                <Link to={`/client/edit/${client.id}`} className="btn btn-dark">
+                  Edit
+                </Link>
+                <button onClick={this.onDeleteClick} className="btn btn-danger">
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+          <hr />
+          <h3 className="card-header">
+            {client.firstName} {client.lastName}
+          </h3>
+          <div className="card-body">
+            <div className="row">
+              <div className="col-md-8 col-sm-6">
+                <h4>
+                  Client ID : &nbsp; {/* adding a space */}
+                  <span className="text-secondary">{client.id}</span>
+                </h4>
+              </div>
+              <div className="col-md-4 col-sm-6">
+                <h3 className="pull-right">
+                  Balance :
+                  <span
+                    className={classnames({
+                      "text-danger": client.balance > 0,
+                      "text-success": client.balance === "0.00"
+                    })}
+                  >
+                    &nbsp; ${parseFloat(client.balance).toFixed(2)}
+                  </span>
+                  &nbsp;
+                  <small>
+                    <a
+                      href="#!"
+                      onClick={() =>
+                        this.setState({
+                          showBalanceUpdate: !this.state.showBalanceUpdate
+                        })
+                      }
+                    >
+                      <i className="fas fa-pencil-alt" />
+                    </a>
+                  </small>
+                </h3>
+                {balanceForm}
+              </div>
+            </div>
+
+            <hr />
+
+            <ul className="list-group">
+              <li className="list-group-item">
+                <h5>Contact Email : {client.email}</h5>
+              </li>
+              <li className="list-group-item">
+                <h5>Contact Phone : {client.phone}</h5>
+              </li>
+            </ul>
+          </div>
+        </div>
+      );
+    } else {
+      return <Spinner />;
+    }
+  }
+}
+
+ClientDetails.propTypes = {
+  firestore: PropTypes.object.isRequired
+};
+
+export default compose(
+  firestoreConnect(props => [
+    { collection: "clients", storeAs: "client", doc: props.match.params.id }
+  ]),
+  connect(({ firestore: { ordered } }, props) => ({
+    //we can access the above clients state via clients props using this.props.clients
+    client: ordered.client && ordered.client[0]
+  }))
+)(ClientDetails);
